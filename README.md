@@ -10,7 +10,7 @@ write in the PullString Author environment and publish to the PullString Platfor
 ## Library
 
 The JavaScript SDK is written in ES6 and uses [Babel](http://babeljs.io/) and [Webpack](https://webpack.github.io/) to
-generate a library for the browser. Run the following command to install the necessary build dependencies.
+generate a library for the browser. While the SDK itself has no dependencies, [Node JS](https://nodejs.org/en/) is required to build the SDK and run the unit tests. After ensuring [Node JS](https://nodejs.org/en/) is installed, run the following command to install the necessary build dependencies.
 
 ```
 npm run init
