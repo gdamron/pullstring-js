@@ -41,7 +41,7 @@ class Conversation {
         let config = { baseUrl: VersionInfo.ApiBaseUrl };
         if (nodeXhr) config.xhr = nodeXhr;
         this._client = new RestClient(config);
-        this._speech = new Speech();
+        this._speech = new Speech(this._client);
         this._request = null;
     }
 
@@ -130,7 +130,17 @@ class Conversation {
      * conversationId set.
      */
     startAudio(request) {
-        if (this._ensureRequest(request)) this._speech.start();
+        if (!this._ensureRequest(request)) return;
+        let endpoint = this._endpointForRequest(this._request);
+        let headers = this._headersForRequest(this._request, 'audio/l16; rate=16000');
+        let params = this._paramsForRequest(this._request);
+
+        this._speech.start(
+            endpoint,
+            params,
+            headers,
+            (response) => this._responseHandler(response)
+        );
     }
 
     /**
@@ -149,14 +159,7 @@ class Conversation {
      * complete the audio request and return the Web API response.
      */
     stopAudio() {
-        let _this = this;
-        this._speech.getBytes((data) => {
-            _this._speech.flush();
-            _this._postAudio(
-                data,
-                _this._request
-            );
-        });
+        this._speech.stop();
     }
 
     /**
@@ -170,24 +173,28 @@ class Conversation {
      * conversationId set.
      * */
     sendAudio(audio, format, request) {
-        if (Object.prototype.toString.call(audio) !== '[object DataView]') {
-            this._returnError('Audio sent to sendAudio is not a DataView');
-            return;
-        }
-
         if (format !== Request.EAudioFormat.Wav16k) {
             this._returnError('Unsupported format sent to sendAudio.');
             return;
         }
 
-        let audioData = this._getWavData(audio);
+        if (!this._ensureRequest(request)) return;
 
-        if (audioData.error) {
-            this._returnError(audioData.error);
-            return;
+        let endpoint = this._endpointForRequest(this._request);
+        let headers = this._headersForRequest(this._request, 'audio/l16; rate=16000');
+        let params = this._paramsForRequest(this._request);
+
+        let err = this._speech.sendAudio(
+            audio,
+            endpoint,
+            params,
+            headers,
+            (response) => this._responseHandler(response)
+        );
+
+        if (err) {
+            this._returnError(err);
         }
-
-        this._postAudio(audioData, request);
     }
 
     /**
@@ -398,49 +405,6 @@ class Conversation {
             this._request.participantId = response.participantId;
         }
         this.onResponse && this.onResponse(response);
-    }
-
-    _getWavData(dataView) {
-        let riff = this._dataViewGetString(dataView, 0, 4);
-
-        if (riff !== 'RIFF') {
-            return { error: 'Data is not a WAV file' };
-        }
-
-        let channels = dataView.getUint16(22, true);
-        let rate = dataView.getUint32(24, true);
-        let bitsPerSample = dataView.getUint16(34, true);
-
-        if (channels !== 1 || rate !== 16000 || bitsPerSample !== 16) {
-            return { error: 'WAV data is not mono 16-bit data at 16k sample rate' };
-        }
-
-        let dataOffset = 12;
-        let chunkSize = dataView.getUint32(16, true);
-        let fileSize = dataView.getUint32(4, true);
-
-        while (this._dataViewGetString(dataView, dataOffset, 4) !== 'data') {
-            if (dataOffset > fileSize) {
-                return { error: 'Cannot find data segment in WAV file' };
-            }
-
-            dataOffset += chunkSize + 8;
-            chunkSize = dataView.getUint32(dataOffset + 4, true);
-        }
-
-        let dataStart = dataOffset + 8;
-        let buffer = dataView.buffer.slice(dataStart);
-        return new Uint8Array(buffer);
-    }
-
-    _dataViewGetString(dataView, offset, length) {
-        let retVal = '';
-        for (let i = 0; i < length; i++) {
-            let charCode = dataView.getUint8(i + offset);
-            retVal = retVal + String.fromCharCode(charCode);
-        }
-
-        return retVal;
     }
 
     _returnError(message) {

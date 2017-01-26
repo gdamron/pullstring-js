@@ -69,15 +69,15 @@ class TestBase {
                 this.conversation.sendAudio();
                 break;
             case 1:
-                this.errorShouldMatch('Audio sent to sendAudio is not a DataView', response, t, true);
-                this.conversation.sendAudio(audio1, 0);
-                break;
-            case 2:
                 this.errorShouldMatch('Unsupported format sent to sendAudio.', response, t, true);
                 this.conversation.sendAudio(audio1, 1);
                 break;
-            case 3:
+            case 2:
                 this.errorShouldMatch('Data is not a WAV file', response, t);
+                break;
+            case 3:
+                this.errorShouldMatch('Audio sent to sendAudio is not a DataView', response, t, true);
+                this.conversation.sendAudio(audio1, 0);
                 break;
             default: (this.fail(t));
             }
